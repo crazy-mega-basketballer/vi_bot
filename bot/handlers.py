@@ -5,12 +5,14 @@ import logging
 from pathlib import Path
 
 from aiogram import Bot, F, Router
+from aiogram.filters import Command
 from aiogram.types import (
     FSInputFile,
     InlineQuery,
     InlineQueryResultArticle,
     InlineQueryResultCachedVideo,
     InputTextMessageContent,
+    Message,
 )
 
 from bot.cache import FileCache
@@ -28,6 +30,25 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 file_cache = FileCache(ttl=CACHE_TTL)
+
+
+@router.message(Command("chatid"))
+async def get_chat_id(message: Message) -> None:
+    """Get current chat ID (useful for finding ARCHIVE_CHAT_ID)."""
+    chat_id = message.chat.id
+    chat_type = message.chat.type
+    chat_title = message.chat.title or message.chat.username or "Unknown"
+
+    response = (
+        f"📋 Chat Info:\n\n"
+        f"ID: `{chat_id}`\n"
+        f"Type: {chat_type}\n"
+        f"Title: {chat_title}\n\n"
+        f"Use this ID as ARCHIVE_CHAT_ID in .env"
+    )
+
+    await message.reply(response, parse_mode="Markdown")
+    logger.info(f"Chat ID requested: {chat_id} ({chat_type})")
 
 
 def create_error_result(error_message: str) -> list[InlineQueryResultArticle]:
