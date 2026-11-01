@@ -43,9 +43,25 @@ async def check_video_size(url: str) -> None:
 
     try:
         info = await asyncio.to_thread(_extract_info)
+    except yt_dlp.utils.DownloadError as e:
+        error_str = str(e)
+        logger.warning(f"Failed to extract video info: {error_str}")
+
+        # User-friendly error messages
+        if "404" in error_str or "not found" in error_str.lower():
+            raise VideoDownloadError("Видео не найдено или удалено")
+        elif "private" in error_str.lower() or "login" in error_str.lower():
+            raise VideoDownloadError("Видео приватное — требуется авторизация")
+        elif "geo" in error_str.lower() or "not available in your country" in error_str.lower():
+            raise VideoDownloadError("Видео недоступно в вашем регионе")
+        elif "unsupported url" in error_str.lower():
+            raise VideoDownloadError("Неподдерживаемая ссылка")
+        else:
+            raise VideoDownloadError(f"Не удалось получить информацию о видео")
+
     except Exception as e:
-        logger.error(f"Failed to extract video info: {e}")
-        raise VideoDownloadError(f"Не удалось получить информацию о видео: {e}")
+        logger.error(f"Unexpected error extracting video info: {e}")
+        raise VideoDownloadError("Не удалось получить информацию о видео")
 
     formats = info.get("formats", [])
     if not formats:
@@ -87,7 +103,12 @@ async def download_video(url: str) -> Path:
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,
-            "format": "bv*[ext=mp4][height<=720]+ba[ext=m4a]/b[ext=mp4][height<=720]/b[height<=720]",
+            # More flexible format selector - fallback chain for better compatibility
+            "format": (
+                "bv*[ext=mp4][height<=720]+ba[ext=m4a]/b[ext=mp4][height<=720]/"
+                "bv*[height<=720]+ba/b[height<=720]/"
+                "bv*+ba/b"
+            ),
             "outtmpl": str(tmp_dir / "video.%(ext)s"),
             "max_filesize": MAX_FILESIZE_BYTES,
             "merge_output_format": "mp4",
@@ -117,12 +138,24 @@ async def download_video(url: str) -> Path:
         return video_path
 
     except yt_dlp.utils.DownloadError as e:
-        logger.warning(f"yt-dlp download error for {url}: {e}")
-        if "too large" in str(e).lower() or "max_filesize" in str(e).lower():
+        error_str = str(e)
+        logger.warning(f"yt-dlp download error for {url}: {error_str}")
+
+        # Parse error and provide user-friendly message
+        if "too large" in error_str.lower() or "max_filesize" in error_str.lower():
             raise VideoTooLargeError(
                 "Видео больше 50 МБ — Telegram не позволяет отправить его ботом"
             )
-        raise VideoDownloadError(f"Ошибка загрузки: {e}")
+        elif "404" in error_str or "not found" in error_str.lower():
+            raise VideoDownloadError("Видео не найдено или удалено")
+        elif "private" in error_str.lower() or "login" in error_str.lower():
+            raise VideoDownloadError("Видео приватное — требуется авторизация")
+        elif "requested format" in error_str.lower() and "not available" in error_str.lower():
+            raise VideoDownloadError("Не удалось найти подходящий формат видео")
+        elif "geo" in error_str.lower() or "not available in your country" in error_str.lower():
+            raise VideoDownloadError("Видео недоступно в вашем регионе")
+        else:
+            raise VideoDownloadError("Не удалось скачать видео")
 
     except Exception as e:
         logger.error(f"Unexpected download error for {url}: {e}")
