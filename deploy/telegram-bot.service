@@ -1,0 +1,23 @@
+[Unit]
+Description=Telegram Inline Video Bot
+After=network.target
+
+[Service]
+Type=simple
+User=botuser
+Group=botuser
+WorkingDirectory=/home/botuser/telegram-inline-video-bot
+Environment="PATH=/home/botuser/telegram-inline-video-bot/venv/bin"
+ExecStart=/home/botuser/telegram-inline-video-bot/venv/bin/python -m bot
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-bot
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
