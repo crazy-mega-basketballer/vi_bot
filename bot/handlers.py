@@ -32,6 +32,76 @@ router = Router()
 file_cache = FileCache(ttl=CACHE_TTL)
 
 
+@router.message(Command("start"))
+async def cmd_start(message: Message) -> None:
+    """Handle /start command."""
+    response = (
+        "👋 Привет! Я бот для скачивания видео из TikTok и YouTube Shorts.\n\n"
+        "🔹 Работаю только в **inline-режиме**\n"
+        "🔹 Откройте любой чат и напишите:\n"
+        f"   `@{(await message.bot.get_me()).username} <ссылка на видео>`\n\n"
+        "Поддерживаемые платформы:\n"
+        "• TikTok (tiktok.com)\n"
+        "• YouTube Shorts (youtube.com/shorts)\n\n"
+        "📋 Доступные команды:\n"
+        "/start - это сообщение\n"
+        "/ping - проверка работоспособности\n"
+        "/chatid - получить ID текущего чата\n"
+        "/stats - статистика кэша"
+    )
+    await message.reply(response, parse_mode="Markdown")
+    logger.info(f"/start from user {message.from_user.id}")
+
+
+@router.message(Command("ping"))
+async def cmd_ping(message: Message, bot: Bot) -> None:
+    """Check bot health."""
+    try:
+        # Check archive chat access
+        archive_chat = await bot.get_chat(ARCHIVE_CHAT_ID)
+        archive_status = f"✅ Доступен ({archive_chat.type})"
+    except Exception as e:
+        archive_status = f"❌ Недоступен: {e}"
+        logger.error(f"Archive chat check failed: {e}")
+
+    # Cache stats
+    cache_size = len(file_cache._cache)
+
+    response = (
+        "🏓 Pong!\n\n"
+        "Статус бота:\n"
+        f"• Архивный чат: {archive_status}\n"
+        f"• Кэш: {cache_size} видео\n"
+        f"• Inline-режим: активен\n\n"
+        "Бот работает нормально!"
+    )
+
+    await message.reply(response)
+    logger.info(f"/ping from user {message.from_user.id}, cache size: {cache_size}")
+
+
+@router.message(Command("stats"))
+async def cmd_stats(message: Message) -> None:
+    """Show cache statistics."""
+    cache_size = len(file_cache._cache)
+
+    # Clean expired entries first
+    file_cache.clear_expired()
+    active_size = len(file_cache._cache)
+
+    response = (
+        "📊 Статистика кэша:\n\n"
+        f"• Всего записей: {cache_size}\n"
+        f"• Активных: {active_size}\n"
+        f"• Истёкших: {cache_size - active_size}\n"
+        f"• TTL: {CACHE_TTL // 60} минут\n\n"
+        "Кэш автоматически очищается при запросе."
+    )
+
+    await message.reply(response)
+    logger.info(f"/stats from user {message.from_user.id}")
+
+
 @router.message(Command("chatid"))
 async def get_chat_id(message: Message) -> None:
     """Get current chat ID (useful for finding ARCHIVE_CHAT_ID)."""
