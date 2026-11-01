@@ -47,22 +47,20 @@ sudo -i -u botuser
 
 ## 3. Клонирование проекта
 
+**Важно:** Можно использовать любое имя директории. В примерах ниже используется `vi_bot` для краткости, но вы можете назвать её как угодно.
+
 ```bash
-# Переключиться на botuser
-sudo -i -u botuser
-
-# Клонировать репозиторий
-cd /home/botuser
-git clone https://github.com/yourusername/telegram-inline-video-bot.git
-cd telegram-inline-video-bot
-
-# Выйти из botuser
-exit
+# Клонировать репозиторий (замените yourusername на ваш GitHub username)
+sudo -u botuser git clone https://github.com/yourusername/telegram-inline-video-bot.git /home/botuser/vi_bot
 ```
 
-Или одной командой без переключения:
+Или можно переключиться на botuser:
 ```bash
-sudo -u botuser git clone https://github.com/yourusername/telegram-inline-video-bot.git /home/botuser/telegram-inline-video-bot
+sudo -i -u botuser
+cd ~
+git clone https://github.com/yourusername/telegram-inline-video-bot.git vi_bot
+cd vi_bot
+exit
 ```
 
 ---
@@ -71,11 +69,11 @@ sudo -u botuser git clone https://github.com/yourusername/telegram-inline-video-
 
 ```bash
 # Создать виртуальное окружение
-sudo -u botuser python3 -m venv /home/botuser/telegram-inline-video-bot/venv
+sudo -u botuser python3 -m venv /home/botuser/vi_bot/venv
 
-# Активировать venv и установить зависимости
+# Установить зависимости
 sudo -u botuser bash -c "
-    cd /home/botuser/telegram-inline-video-bot
+    cd /home/botuser/vi_bot
     source venv/bin/activate
     pip install --upgrade pip
     pip install -r requirements.txt
@@ -84,8 +82,10 @@ sudo -u botuser bash -c "
 
 Проверить установку:
 ```bash
-sudo -u botuser /home/botuser/telegram-inline-video-bot/venv/bin/python -c "import bot; print('OK')"
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && venv/bin/python -c 'import bot; print(\"OK\")'"
 ```
+
+Должно вывести: `OK`
 
 ---
 
@@ -93,7 +93,7 @@ sudo -u botuser /home/botuser/telegram-inline-video-bot/venv/bin/python -c "impo
 
 ### Создать .env файл
 ```bash
-sudo -u botuser nano /home/botuser/telegram-inline-video-bot/.env
+sudo -u botuser nano /home/botuser/vi_bot/.env
 ```
 
 ### Заполнить следующие переменные:
@@ -101,9 +101,8 @@ sudo -u botuser nano /home/botuser/telegram-inline-video-bot/.env
 # Токен от @BotFather
 BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz123456789
 
-# ID чата для хранения видео (приватный канал или чат, куда бот добавлен как админ)
-# Получить: создать приватный канал, добавить бота как администратора,
-# переслать любое сообщение из канала в @userinfobot
+# ID чата для хранения видео (приватный канал, куда бот добавлен как админ)
+# ВАЖНО: ID канала начинается с минуса, например: -1001234567890
 ARCHIVE_CHAT_ID=-1001234567890
 
 # Уровень логирования
@@ -113,13 +112,62 @@ LOG_LEVEL=INFO
 CACHE_TTL=3600
 ```
 
-Сохранить (Ctrl+O, Enter, Ctrl+X).
+Сохранить: `Ctrl+O`, `Enter`, `Ctrl+X`
 
 ### Проверить права доступа
 ```bash
-sudo chmod 600 /home/botuser/telegram-inline-video-bot/.env
-sudo chown botuser:botuser /home/botuser/telegram-inline-video-bot/.env
+sudo chmod 600 /home/botuser/vi_bot/.env
+sudo chown botuser:botuser /home/botuser/vi_bot/.env
 ```
+
+---
+
+## 5.1. Как получить ARCHIVE_CHAT_ID
+
+**Способ 1: Через команду `/chatid` в боте (рекомендуется)**
+
+1. Запустить бота временно:
+   ```bash
+   sudo -u botuser bash -c "cd /home/botuser/vi_bot && venv/bin/python -m bot"
+   ```
+
+2. Создать приватный канал в Telegram
+
+3. Добавить бота в канал как администратора (с правом "Post messages")
+
+4. Отправить в канал команду: `/chatid`
+
+5. Бот ответит с ID канала:
+   ```
+   📋 Chat Info:
+   
+   ID: -1001234567890
+   Type: channel
+   Title: My Archive Channel
+   
+   Use this ID as ARCHIVE_CHAT_ID in .env
+   ```
+
+6. Скопировать ID (с минусом!) в .env
+
+7. Остановить временный запуск: `Ctrl+C`
+
+**Способ 2: Через @raw_data_bot**
+
+1. Добавить [@raw_data_bot](https://t.me/raw_data_bot) в ваш приватный канал как администратора
+2. Отправить любое сообщение в канал
+3. Бот покажет JSON, найти `"chat":{"id":-1001234567890,...}`
+4. Скопировать значение `id`
+
+**Способ 3: Через @getidsbot**
+
+1. Добавить [@getidsbot](https://t.me/getidsbot) в канал
+2. Бот автоматически отправит ID
+
+**Важно:**
+- ID канала **ВСЕГДА** начинается с минуса: `-1001234567890`
+- ID личного чата — положительное число (это НЕ то, что нужно!)
+- Бот должен быть администратором канала с правом "Post messages"
 
 ---
 
@@ -139,24 +187,48 @@ sudo chown botuser:botuser /home/botuser/telegram-inline-video-bot/.env
 Проверить, что бот запускается без ошибок:
 
 ```bash
-sudo -u botuser /home/botuser/telegram-inline-video-bot/venv/bin/python -m bot
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && venv/bin/python -m bot"
 ```
 
 Если всё ОК, вы увидите:
 ```
-2026-11-01 20:21:50 [INFO] bot.__main__: Starting bot...
-2026-11-01 20:21:51 [INFO] bot.__main__: Bot started, waiting for inline queries...
+2026-11-02 21:08:50 [INFO] bot.__main__: Starting bot...
+2026-11-02 21:08:51 [INFO] bot.__main__: Bot started, waiting for inline queries...
 ```
 
 Остановить тестовый запуск: **Ctrl+C**
+
+**Типичные ошибки на этом этапе:**
+
+1. **`No module named bot`** — забыли перейти в директорию проекта (`cd /home/botuser/vi_bot`)
+2. **`BOT_TOKEN not set`** — не создан файл `.env` или токен не указан
+3. **`ARCHIVE_CHAT_ID not set`** — не указан ID канала в `.env`
 
 ---
 
 ## 8. Установка systemd service
 
+### Отредактировать service-файл под вашу директорию
+
+Если вы используете имя директории отличное от `telegram-inline-video-bot`, нужно отредактировать service-файл:
+
+```bash
+sudo nano /home/botuser/vi_bot/deploy/telegram-bot.service
+```
+
+Изменить пути в секции `[Service]`:
+```ini
+[Service]
+WorkingDirectory=/home/botuser/vi_bot
+Environment="PATH=/home/botuser/vi_bot/venv/bin"
+ExecStart=/home/botuser/vi_bot/venv/bin/python -m bot
+```
+
+Сохранить: `Ctrl+O`, `Enter`, `Ctrl+X`
+
 ### Скопировать service-файл
 ```bash
-sudo cp /home/botuser/telegram-inline-video-bot/deploy/telegram-bot.service /etc/systemd/system/
+sudo cp /home/botuser/vi_bot/deploy/telegram-bot.service /etc/systemd/system/
 ```
 
 ### Перезагрузить systemd
@@ -184,6 +256,11 @@ sudo systemctl status telegram-bot
 ● telegram-bot.service - Telegram Inline Video Bot
      Loaded: loaded (/etc/systemd/system/telegram-bot.service; enabled; ...)
      Active: active (running) since ...
+```
+
+Если статус `failed`, смотрите логи:
+```bash
+sudo journalctl -u telegram-bot -n 50
 ```
 
 ---
@@ -241,33 +318,30 @@ sudo systemctl status telegram-bot
 Когда вы пушите новый код в GitHub и хотите обновить бота на сервере:
 
 ```bash
-# Переключиться на botuser
-sudo -u botuser bash
-
-# Перейти в директорию проекта
-cd /home/botuser/telegram-inline-video-bot
-
-# Получить изменения
-git pull origin main
-
-# Обновить зависимости (если изменился requirements.txt)
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Выйти из botuser
-exit
+# Получить изменения и обновить зависимости
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && git pull && source venv/bin/activate && pip install -r requirements.txt"
 
 # Перезапустить бота
 sudo systemctl restart telegram-bot
 
 # Проверить статус
 sudo systemctl status telegram-bot
+
+# Посмотреть логи
+sudo journalctl -u telegram-bot -n 20
 ```
 
-Или одной командой:
+Или пошагово:
 ```bash
-sudo -u botuser bash -c "cd /home/botuser/telegram-inline-video-bot && git pull && source venv/bin/activate && pip install -r requirements.txt"
+sudo -i -u botuser
+cd ~/vi_bot
+git pull origin main
+source venv/bin/activate
+pip install -r requirements.txt
+exit
+
 sudo systemctl restart telegram-bot
+sudo systemctl status telegram-bot
 ```
 
 ---
@@ -292,23 +366,33 @@ sudo journalctl -u telegram-bot -n 50
 
 **Типичные ошибки:**
 
-1. **"BOT_TOKEN not set"**
-   - Проверить `.env`: `sudo -u botuser cat /home/botuser/telegram-inline-video-bot/.env`
-   - Убедиться, что токен скопирован без пробелов
+1. **"No module named bot"**
+   - Проблема: команда запущена не из директории проекта
+   - Решение: всегда используйте `cd /home/botuser/vi_bot` перед запуском
+   - Правильно: `sudo -u botuser bash -c "cd /home/botuser/vi_bot && venv/bin/python -m bot"`
+   - Неправильно: `sudo -u botuser /home/botuser/vi_bot/venv/bin/python -m bot`
 
-2. **"ARCHIVE_CHAT_ID not set"**
-   - Создать приватный канал
-   - Добавить бота как администратора
-   - Получить ID через @userinfobot
+2. **"BOT_TOKEN not set"**
+   - Проверить `.env`: `sudo -u botuser cat /home/botuser/vi_bot/.env`
+   - Убедиться, что токен скопирован без пробелов и кавычек
 
-3. **"ModuleNotFoundError: No module named 'aiogram'"**
+3. **"ARCHIVE_CHAT_ID not set" или "must be integer"**
+   - Проверить `.env`: ID должен быть отрицательным числом: `-1001234567890`
+   - ID личного чата (положительное число) НЕ подойдёт
+   - Используйте команду `/chatid` в канале для получения правильного ID
+
+4. **"ModuleNotFoundError: No module named 'aiogram'"**
    - Переустановить зависимости:
      ```bash
-     sudo -u botuser bash -c "cd /home/botuser/telegram-inline-video-bot && source venv/bin/activate && pip install -r requirements.txt"
+     sudo -u botuser bash -c "cd /home/botuser/vi_bot && source venv/bin/activate && pip install -r requirements.txt"
      ```
 
-4. **"ffmpeg: not found"**
+5. **"ffmpeg: not found"**
    - Установить: `sudo apt install -y ffmpeg`
+
+6. **"Unauthorized" или "401 Unauthorized"**
+   - Неверный BOT_TOKEN
+   - Проверить токен в BotFather
 
 ### Бот запустился, но не отвечает
 
@@ -316,8 +400,9 @@ sudo journalctl -u telegram-bot -n 50
    - BotFather → `/setinline` → выбрать бота
 
 2. **Проверить ARCHIVE_CHAT_ID:**
-   - Бот должен быть администратором канала/чата
-   - ID должен быть отрицательным числом для групп/каналов
+   - Бот должен быть администратором канала с правом "Post messages"
+   - ID должен быть отрицательным числом (начинается с минуса): `-1001234567890`
+   - Проверить: отправить `/chatid` в канал, где бот админ
 
 3. **Проверить логи на ошибки:**
    ```bash
@@ -407,25 +492,53 @@ systemd-cgtop
 
 ## Краткая шпаргалка команд
 
+**Замените `vi_bot` на имя вашей директории, если используете другое.**
+
 ```bash
-# Установка
+# === УСТАНОВКА ===
 sudo apt update && sudo apt install -y python3.12 python3.12-venv ffmpeg git
 sudo useradd -r -m -d /home/botuser -s /bin/bash botuser
-sudo -u botuser git clone <repo-url> /home/botuser/telegram-inline-video-bot
-sudo -u botuser bash -c "cd /home/botuser/telegram-inline-video-bot && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
-sudo -u botuser nano /home/botuser/telegram-inline-video-bot/.env
-sudo cp /home/botuser/telegram-inline-video-bot/deploy/telegram-bot.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable telegram-bot && sudo systemctl start telegram-bot
+sudo -u botuser git clone https://github.com/yourusername/telegram-inline-video-bot.git /home/botuser/vi_bot
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
 
-# Управление
-sudo systemctl status telegram-bot     # Статус
-sudo systemctl restart telegram-bot    # Перезапуск
-sudo systemctl stop telegram-bot       # Остановка
-sudo journalctl -u telegram-bot -f     # Логи
+# Создать .env
+sudo -u botuser nano /home/botuser/vi_bot/.env
 
-# Обновление
-sudo -u botuser bash -c "cd /home/botuser/telegram-inline-video-bot && git pull && source venv/bin/activate && pip install -r requirements.txt"
+# Получить ARCHIVE_CHAT_ID
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && venv/bin/python -m bot"
+# Отправить /chatid в канал, скопировать ID, остановить бота (Ctrl+C)
+
+# Отредактировать пути в service-файле
+sudo nano /home/botuser/vi_bot/deploy/telegram-bot.service
+# Изменить WorkingDirectory и ExecStart на /home/botuser/vi_bot
+
+# Установить service
+sudo cp /home/botuser/vi_bot/deploy/telegram-bot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable telegram-bot
+sudo systemctl start telegram-bot
+
+# === УПРАВЛЕНИЕ ===
+sudo systemctl status telegram-bot      # Статус
+sudo systemctl restart telegram-bot     # Перезапуск
+sudo systemctl stop telegram-bot        # Остановка
+sudo journalctl -u telegram-bot -f      # Логи в реальном времени
+sudo journalctl -u telegram-bot -n 50   # Последние 50 строк логов
+
+# === ОБНОВЛЕНИЕ ===
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && git pull && source venv/bin/activate && pip install -r requirements.txt"
 sudo systemctl restart telegram-bot
+sudo systemctl status telegram-bot
+
+# === ПРОВЕРКА ===
+# Проверить импорт модуля
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && venv/bin/python -c 'import bot; print(\"OK\")'"
+
+# Проверить .env
+sudo -u botuser cat /home/botuser/vi_bot/.env
+
+# Тестовый запуск
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && venv/bin/python -m bot"
 ```
 
 ---

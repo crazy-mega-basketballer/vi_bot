@@ -57,9 +57,38 @@ nano .env  # или любой другой редактор
 Заполнить в `.env`:
 
 - `BOT_TOKEN`: получить через [@BotFather](https://t.me/BotFather)
-- `ARCHIVE_CHAT_ID`: ID приватного канала или чата, куда бот будет загружать видео (получить через [@userinfobot](https://t.me/userinfobot))
+- `ARCHIVE_CHAT_ID`: ID приватного канала, куда бот будет загружать видео
+  - **Важно**: ID канала начинается с минуса, например: `-1001234567890`
+  - **Как получить**: см. раздел "Как получить ARCHIVE_CHAT_ID" ниже
 - `LOG_LEVEL`: уровень логирования (DEBUG, INFO, WARNING, ERROR)
 - `CACHE_TTL`: время жизни кэша в секундах (по умолчанию 3600)
+
+### 5.1. Как получить ARCHIVE_CHAT_ID
+
+**Способ 1: Через команду `/chatid` в боте (рекомендуется)**
+
+1. Создать приватный канал в Telegram
+2. Запустить бота локально: `python -m bot`
+3. Добавить бота в канал как администратора (с правом "Post messages")
+4. Отправить в канал команду: `/chatid`
+5. Бот ответит с ID канала (например: `-1001234567890`)
+6. Скопировать ID в `.env`
+7. Остановить бота: `Ctrl+C`
+
+**Способ 2: Через @raw_data_bot**
+
+1. Добавить [@raw_data_bot](https://t.me/raw_data_bot) в ваш приватный канал
+2. Отправить любое сообщение в канал
+3. Бот покажет JSON с `"chat":{"id":-1001234567890,...}`
+
+**Способ 3: Через @getidsbot**
+
+1. Добавить [@getidsbot](https://t.me/getidsbot) в канал
+2. Бот автоматически отправит ID
+
+**Важно:**
+- ID канала **ВСЕГДА** начинается с минуса: `-1001234567890`
+- ID личного чата (положительное число) НЕ подойдёт
 
 ### 6. Настроить бота в BotFather
 
@@ -81,50 +110,40 @@ python -m bot
 
 ### Production (Ubuntu 24.04 с systemd)
 
-#### 1. Создать пользователя
+**Полная инструкция в [DEPLOY.md](DEPLOY.md)**
+
+Краткая версия:
 
 ```bash
+# Установка зависимостей
+sudo apt update && sudo apt install -y python3.12 python3.12-venv ffmpeg git
+
+# Создать пользователя
 sudo useradd -r -m -d /home/botuser -s /bin/bash botuser
-```
 
-#### 2. Скопировать файлы
+# Клонировать проект (замените yourusername и vi_bot на свои)
+sudo -u botuser git clone https://github.com/yourusername/telegram-inline-video-bot.git /home/botuser/vi_bot
 
-```bash
-sudo cp -r . /home/botuser/telegram-inline-video-bot
-sudo chown -R botuser:botuser /home/botuser/telegram-inline-video-bot
-```
+# Установить зависимости
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
 
-#### 3. Установить виртуальное окружение
+# Создать .env
+sudo -u botuser nano /home/botuser/vi_bot/.env
 
-```bash
-sudo -u botuser bash
-cd /home/botuser/telegram-inline-video-bot
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-exit
-```
+# Получить ARCHIVE_CHAT_ID (временно запустить бота)
+sudo -u botuser bash -c "cd /home/botuser/vi_bot && venv/bin/python -m bot"
+# Отправить /chatid в канал, скопировать ID, остановить (Ctrl+C)
 
-#### 4. Настроить .env
+# Отредактировать пути в service-файле
+sudo nano /home/botuser/vi_bot/deploy/telegram-bot.service
+# Изменить WorkingDirectory и ExecStart на /home/botuser/vi_bot
 
-```bash
-sudo -u botuser nano /home/botuser/telegram-inline-video-bot/.env
-```
-
-#### 5. Установить systemd service
-
-```bash
-sudo cp deploy/telegram-bot.service /etc/systemd/system/
+# Установить service
+sudo cp /home/botuser/vi_bot/deploy/telegram-bot.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable telegram-bot
 sudo systemctl start telegram-bot
-```
-
-#### 6. Проверить статус
-
-```bash
 sudo systemctl status telegram-bot
-sudo journalctl -u telegram-bot -f
 ```
 
 ## Использование
@@ -188,6 +207,41 @@ finally:
 ```
 
 Блок `finally` выполняется даже при исключениях.
+
+### Что такое "архивный чат"?
+
+**Архивный чат** — это приватный канал, куда бот загружает видео для получения `file_id`.
+
+**Зачем это нужно:**
+- Telegram Bot API не позволяет напрямую отправлять видео по URL в inline-результатах
+- Нужно сначала загрузить видео в Telegram, получить `file_id`
+- С `file_id` можно отправлять видео мгновенно и многократно
+- Локальный файл удаляется сразу после загрузки
+- Видео в архивном канале остаётся (можно удалить вручную при необходимости)
+
+**Как работает:**
+1. Бот скачивает видео на сервер
+2. Отправляет в архивный канал → получает `file_id`
+3. Удаляет локальный файл
+4. Сохраняет `file_id` в кэш
+5. Повторные запросы используют `file_id` без скачивания
+
+## FAQ
+
+**Q: Удаляются ли видео из архивного канала автоматически?**  
+A: Нет, видео остаются в канале. Можно удалять вручную или оставить (они не занимают место на сервере).
+
+**Q: Можно ли использовать группу вместо канала?**  
+A: Да, но приватный канал предпочтительнее (меньше уведомлений, проще управление).
+
+**Q: Почему @userinfobot показывает не тот ID?**  
+A: @userinfobot показывает ID отправителя, не канала. Используйте команду `/chatid` в боте или @raw_data_bot.
+
+**Q: Можно ли скачивать видео больше 50 МБ?**  
+A: Нет, это жёсткий лимит Telegram Bot API для `send_video`. Бот блокирует такие видео до скачивания.
+
+**Q: Работает ли бот с приватными видео?**  
+A: Нет, yt-dlp не может скачивать видео, требующие авторизации.
 
 ## Ограничения
 
